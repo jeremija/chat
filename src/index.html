@@ -1,0 +1,135 @@
+<html>
+<head>
+	<title>Test</title>
+	<script src="/socket.io/socket.io.js"></script>
+	<script>
+		function start() {
+			var socket = io.connect('http://localhost');
+
+			function addUser(user) {
+				var userElement = document.createElement('p');
+				userElement.innerHTML = user.name;
+
+				document.getElementById('users-list').appendChild(userElement);
+			}
+
+			function addMessage(data) {
+				var message = document.createElement('p');
+				var date = new Date(data.timestamp || Date.now());
+
+				message.innerHTML =
+					'<strong>' +
+					pad(date.getHours()) + ':' + pad(date.getMinutes()) + ':' +
+					pad(date.getSeconds()) + ' [' + data.name + '] ' +
+					'</strong>' + data.message;
+
+				if (data.name === currentUser) {
+					message.style.color = 'blue';
+				}
+
+				document.getElementById('chat-log').appendChild(message);
+				window.scrollTo(0, document.body.scrollHeight);
+			}
+
+			socket.on('user-add', function(user) {
+				addUser(user);
+				addMessage({
+					name: 'chat-bot',
+					message: 'user ' + user.name + ' joined'
+				})
+			});
+
+			socket.on('users', function(users) {
+				for (var i in users) {
+					var username = users[i];
+					addUser({
+						name: username
+					});
+				}
+			});
+
+			function findUserElement(name) {
+				var users = document.getElementById('users-list').children;
+
+				for(var i in users) {
+					var user = users[i];
+					if (user.innerHTML === name) {
+						return user;
+					}
+				}
+			}
+
+			socket.on('user-remove', function(data) {
+				var user = findUserElement(data.name);
+				var userList = user.parentNode;
+				userList.removeChild(user);
+
+				addMessage({
+					name: 'chat-bot',
+					message: 'user ' + data.name + ' left'
+				})
+			});
+
+			// socket.on('user-rename', function(data) {
+			// 	var user = findUserElement(data.oldName);
+			// 	user.innerHTML = data.name;
+			// });
+
+			function pad(num) {
+				num = num.toString();
+				while (num.length < 2) {
+					num = '0' + num;
+				}
+				return num;
+			}
+
+			socket.on('receive-message', function(data) {
+				addMessage(data);
+			});
+
+			document.getElementById('message-form').addEventListener(
+				'submit', function(event) {
+				event.preventDefault();
+
+				var input = document.getElementById('message-input');
+				var value = input.value;
+				input.value = '';
+
+				socket.emit('send-message', value);
+			});
+
+			var currentUser = prompt('enter your name');
+
+			socket.emit('join', currentUser);
+
+			addMessage({
+				name: 'chat-bot',
+				message: 'welcome ' + currentUser
+			});
+
+		}
+	</script>
+
+	<style type="text/css">
+		p {
+			margin: 0;
+		}
+	</style>
+</head>
+<body onload="start()" style="margin: 0; padding: 0;">
+	<div id="users-list" style="float: right; text-align: right;">
+
+	</div>
+	</div>
+	<div id="chat">
+		<div id="chat-log" style="margin-bottom: 3em;">
+		</div>
+		<div id="input" style="position: fixed; bottom: 0; background: gray; width: 100%">
+			<form id="message-form" style="margin: 0;">
+				<input type="text" id="message-input" style="width: 100%;" placeholder="enter your text here and press enter">
+				<input type="submit" style="position: fixed; left: -9999; visibility: hidden;">
+			</form>
+		</div>
+	</div>
+</body>
+</html>
